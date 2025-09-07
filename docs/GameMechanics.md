@@ -14,36 +14,48 @@
 8. [UI/UX系統](#uiux系統)
 9. [進度與存檔系統](#進度與存檔系統)
 10. [性能優化建議](#性能優化建議)
+11. [成就系統](#成就系統)
 
 ---
 
-## 核心系統架構
+這是一份根據您的需求，為《Pizzafly》遊戲設計的更完整技術文件，涵蓋了您提出的所有章節。
+
+-----
+
+### \# Pizzafly - 技術設計文件
+
+## 1\. 核心系統架構
+
+為了確保遊戲的模組化與可擴展性，我們將遊戲邏輯劃分為多個獨立的單一職責模組。每個模組負責特定的功能，並通過公共介面相互溝通。
 
 ### 主要模組
-- **GameManager** - 遊戲狀態管理
-- **RestaurantManager** - 餐廳經營邏輯
-- **PhysicsManager** - 物理系統控制
-- **OrderSystem** - 訂單管理
-- **EventSystem** - 事件觸發與處理
-- **NetworkManager** - 多人同步
-- **UIManager** - 介面管理
 
-### 資料流向
-```
-顧客點餐 → 訂單系統 → 廚房系統 → 物理互動 → 完成訂單 → 評分系統 → 經營數據更新
-```
+  - **GameManager**: 遊戲的總控制中心，管理遊戲狀態（如遊戲開始、結束、暫停）、場景加載、玩家資料儲存與讀取。
+  - **RestaurantManager**: 負責所有餐廳經營相關的邏輯，包括財務管理、員工管理、設備狀態與升級。
+  - **PhysicsManager**: 專門處理遊戲中瘋狂的物理互動，優化物理計算，並管理特殊物理效果（如披薩麵團的彈性）。
+  - **OrderSystem**: 管理顧客的訂單生成、分配、追蹤與完成。
+  - **EventSystem**: 事件觸發與處理，並與新聞系統連動。
+  - **NetworkManager**: 多人同步，包含玩家位置、物件狀態與訂單同步。
+  - **UIManager**: 介面管理，統一管理所有遊戲介面（UI）的顯示、隱藏與互動。
+  - **AISystem**: 管理所有 NPC 顧客與員工的行為邏輯。
+  - **AchievementSystem**: 管理成就的解鎖與追蹤。
 
----
+-----
 
-## 經營系統
+## 2\. 經營系統
 
-### 💰 財務管理
+這個模組將處理所有與餐廳經營相關的複雜邏輯，確保玩家的每個決策都能對財務與聲譽產生真實影響。
+
+### 財務管理
+
+`FinancialSystem.cs` 是一個獨立的組件，附屬於 `RestaurantManager`。它負責追蹤所有收入與支出。
+
 ```csharp
 public class FinancialSystem 
 {
-    public float CurrentMoney { get; set; }
-    public float DailyRevenue { get; set; }
-    public float DailyCosts { get; set; }
+    public float CurrentMoney { get; private set; }
+    public float DailyRevenue { get; private set; }
+    public float DailyCosts { get; private set; }
     
     // 成本計算
     public void CalculateCosts()
@@ -56,511 +68,151 @@ public class FinancialSystem
 }
 ```
 
-### 📱 智慧手機系統
-- **評論系統**：顧客滿意度 → 評分 → 線上評論
-- **新聞系統**：隨機事件影響市場
-- **行情系統**：食材價格波動（供需模型）
+### 庫存管理
 
-### 🌟 聲望與評級
-```csharp
-public enum CustomerSatisfaction 
-{
-    Terrible = 1,    // 😡
-    Poor = 2,        // 😞 
-    Average = 3,     // 😐
-    Good = 4,        // 😊
-    Excellent = 5    // 🤩
-}
-```
+`InventoryManager.cs` 負責管理所有食材與非食品庫存。
 
----
+**Unity 實作說明**:
 
-## 物理互動系統
+  - 創建一個 `InventoryManager` 腳本，使用字典（`Dictionary<string, InventoryItem>`）來儲存各種物品及其數量。
+  - `InventoryItem` 類別包含物品名稱、數量、進貨成本、以及過期時間等屬性。
+  - 定期檢查過期物品，並從庫存中移除，同時計入成本。
 
-### 🌀 物理效果實現
+-----
 
-#### 重力翻轉器
-```csharp
-public class GravityController 
-{
-    public Vector3 gravityDirection = Vector3.down;
-    
-    public void FlipGravity()
-    {
-        gravityDirection = -gravityDirection;
-        Physics.gravity = gravityDirection * 9.81f;
-    }
-}
-```
+## 3\. 物理互動系統
 
-#### 磁性披薩盤
-```csharp
-public class MagneticPlate : MonoBehaviour 
-{
-    public float magneticForce = 10f;
-    public LayerMask metalObjects;
-    
-    void Update()
-    {
-        AttractMetalObjects();
-    }
-    
-    void AttractMetalObjects()
-    {
-        Collider[] metals = Physics.OverlapSphere(transform.position, magneticForce);
-        foreach(var metal in metals)
-        {
-            if(metal.CompareTag("Metal"))
-            {
-                Vector3 direction = (transform.position - metal.transform.position).normalized;
-                metal.attachedRigidbody?.AddForce(direction * magneticForce);
-            }
-        }
-    }
-}
-```
+這個系統將是《Pizzafly》獨特樂趣的來源。它需要精細的物理參數調整與事件監聽。
 
-#### 時空傳送門
-```csharp
-public class Portal : MonoBehaviour 
-{
-    public Transform destination;
-    public float teleportCooldown = 2f;
-    
-    private void OnTriggerEnter(Collider other)
-    {
-        if(other.CompareTag("Pizza") || other.CompareTag("Ingredient"))
-        {
-            TeleportObject(other.gameObject);
-        }
-    }
-    
-    void TeleportObject(GameObject obj)
-    {
-        // 特效
-        // 隨機目標（可能是馬桶）
-        // 傳送邏輯
-    }
-}
-```
+### 物理物件管理
 
----
+`PhysicsManager.cs` 將管理所有可互動的物理物件，並處理特定事件。
 
-## 配料系統
+**Unity 實作說明**:
 
-### 🧂 配料分類與屬性
-```csharp
-public enum IngredientType 
-{
-    Normal,      // 普通配料
-    Living,      // 活體配料
-    Emotional,   // 情緒配料  
-    Dimensional, // 4D配料
-    Sonic        // 聲音配料
-}
+  - 所有可互動物件（如披薩、食材、餐具）都應有 `Rigidbody` 和 `Collider`。
+  - 創建一個 `InteractableObject.cs` 腳本，內含 `OnGrab()`, `OnDrop()`, `OnThrow()` 等方法，並透過事件或委託（Delegate）通知 `PhysicsManager`。
+  - 利用 Unity 的 `Physics` 函式庫，如 `Physics.Raycast` 進行物件拾取，並使用 `Rigidbody.AddForce` 實現投擲效果。
 
-public class Ingredient : MonoBehaviour 
-{
-    public IngredientType type;
-    public string ingredientName;
-    public float cost;
-    public float satisfactionModifier;
-    public List<SpecialEffect> effects;
-    
-    // 活體配料行為
-    public void SimulateLivingBehavior() 
-    {
-        if(type == IngredientType.Living)
-        {
-            // 魚游泳動畫
-            // 蔬菜逃跑邏輯
-        }
-    }
-}
-```
+-----
 
-### 🎨 配料組合系統
-```csharp
-public class PizzaRecipe 
-{
-    public List<Ingredient> ingredients;
-    public string recipeName;
-    public bool isSecretRecipe;
-    
-    public float CalculateSatisfaction()
-    {
-        float baseSatisfaction = 1f;
-        float combinationBonus = CalculateCombinationBonus();
-        return baseSatisfaction * combinationBonus;
-    }
-    
-    float CalculateCombinationBonus()
-    {
-        // 檢查特殊組合
-        // 例如：恐龍肉 + 時光配料 = 史前體驗
-        return 1f;
-    }
-}
-```
+## 4\. 配料系統
 
----
+配料系統是遊戲創意的核心。它必須能夠處理任何物件作為配料。
 
-## 角色與AI系統
+**Unity 實作說明**:
 
-### 🧑‍🍳 員工AI行為樹
-```
-員工行為根節點
-├── 檢查任務優先級
-├── 移動到工作站
-├── 執行任務
-│   ├── 製作披薩
-│   ├── 清理廚房
-│   └── 服務顧客
-└── 處理特殊事件
-```
+  - 創建一個 `ToppingData` ScriptableObject，用於儲存每種配料的屬性，如名稱、成本、外觀模型、以及是否為「非食品」的標記。
+  - 披薩模型將由一個核心圓盤和多個可獨立附著的配料模型組成。
+  - 使用 `Instantiate` 方法動態生成配料物件，並將其父級設為披薩模型，以確保配料跟隨披薩移動。
+  - `Pizza.cs` 腳本將維護一個配料列表，記錄每個披薩上放置了哪些配料。
 
-### 動物員工特殊行為
-```csharp
-public class AnimalEmployee : Employee 
-{
-    public AnimalType animalType;
-    
-    public override void PerformTask()
-    {
-        switch(animalType)
-        {
-            case AnimalType.Dolphin:
-                // 需要水池環境檢查
-                if(!IsInWater()) return;
-                break;
-            case AnimalType.Monkey:
-                // 偷吃機率計算
-                if(Random.Range(0f, 1f) < 0.1f) StealFood();
-                break;
-            case AnimalType.Parrot:
-                // 爆料顧客隱私
-                if(Random.Range(0f, 1f) < 0.05f) RevealCustomerSecrets();
-                break;
-        }
-        base.PerformTask();
-    }
-}
-```
+-----
 
-### 🧍 特殊顾客AI
-```csharp
-public class SpecialCustomer : Customer 
-{
-    public SpecialCustomerType type;
-    
-    public override void PlaceOrder()
-    {
-        switch(type)
-        {
-            case SpecialCustomerType.TimeTravel:
-                // 點史前配料
-                OrderPrehistoricIngredients();
-                break;
-            case SpecialCustomerType.Invisible:
-                // 只能通過聲音識別
-                EnableAudioOnlyMode();
-                break;
-            case SpecialCustomerType.Shadow:
-                // 需要特定燈光
-                RequireLightingAdjustment();
-                break;
-        }
-    }
-}
-```
+## 5\. 角色與 AI 系統
 
----
+這個系統將處理所有 NPC 的行為，從點餐到對玩家行為的反應。
 
-## 事件系統
+### 顧客 AI
 
-### 🌀 事件觸發機制
-```csharp
-public class EventManager : MonoBehaviour 
-{
-    public List<GameEvent> availableEvents;
-    public List<GameEvent> activeEvents;
-    
-    void Update()
-    {
-        CheckEventTriggers();
-        UpdateActiveEvents();
-    }
-    
-    void CheckEventTriggers()
-    {
-        foreach(var gameEvent in availableEvents)
-        {
-            if(gameEvent.ShouldTrigger())
-            {
-                TriggerEvent(gameEvent);
-            }
-        }
-    }
-}
-```
+**Unity 實作說明**:
 
-### 事件類型實現
-```csharp
-public class PizzaRainEvent : GameEvent 
-{
-    public override void Execute()
-    {
-        // 生成從天而降的披薩
-        for(int i = 0; i < 50; i++)
-        {
-            Vector3 randomPos = GetRandomSkyPosition();
-            GameObject pizza = Instantiate(pizzaPrefab, randomPos, Quaternion.identity);
-            pizza.GetComponent<Rigidbody>().AddForce(Vector3.down * 10f);
-        }
-    }
-}
+  - 創建 `CustomerAI.cs` 腳本，使用**狀態機**來管理顧客的行為，例如：`WalkingToCounter`, `WaitingForOrder`, `Eating`, `Leaving`。
+  - 顧客 AI 將會與 `OrderSystem` 互動，當進入 `WaitingForOrder` 狀態時，向 `OrderSystem` 發送請求。
+  - 顧客的評價將基於多個參數：製作時間、披薩品質（配料種類、是否過期）、以及玩家的服務態度。
 
-public class GravityAnomalyEvent : GameEvent 
-{
-    public override void Execute()
-    {
-        // 局部重力異常
-        Collider[] affectedObjects = Physics.OverlapSphere(epicenter, radius);
-        foreach(var obj in affectedObjects)
-        {
-            if(obj.GetComponent<Rigidbody>())
-            {
-                obj.GetComponent<Rigidbody>().useGravity = false;
-                // 添加漂浮效果
-            }
-        }
-    }
-}
-```
+### 員工 AI
 
-### 🔗 事件連鎖反應
-```csharp
-public class ChainEventSystem 
-{
-    public Dictionary<string, List<string>> eventChains;
-    
-    public void InitializeChains()
-    {
-        // 披薩雨 + 重力異常 = 顧客飛天抓披薩
-        eventChains["PizzaRain_GravityAnomaly"] = new List<string> 
-        { 
-            "CustomersFlyingToCatchPizza" 
-        };
-    }
-}
-```
+**Unity 實作說明**:
 
----
+  - 創建 `EmployeeAI.cs` 腳本，類似於顧客 AI，但其狀態機將基於其專長。例如，「收納大師」會優先執行 `OrganizingInventory` 狀態，而「金牌店員」則會優先執行 `CleaningTables`。
 
-## 多人網路系統
+-----
 
-### 🌐 網路架構
-```csharp
-public class NetworkManager : MonoBehaviourPunPV 
-{
-    // 使用 Photon PUN 2 或類似解決方案
-    
-    [PunRPC]
-    void SyncPizzaState(int pizzaID, Vector3 position, Vector3 rotation)
-    {
-        // 同步披薩狀態
-    }
-    
-    [PunRPC]
-    void TriggerChaosEvent(string eventName, float[] parameters)
-    {
-        // 同步混亂事件
-    }
-}
-```
+## 6\. 事件系統
 
-### 競爭模式實現
-```csharp
-public class CompetitiveMode : MonoBehaviour 
-{
-    public void ExecuteSabotage(SabotageType type, int targetPlayerID)
-    {
-        switch(type)
-        {
-            case SabotageType.HackOrders:
-                // 竄改對手訂單
-                break;
-            case SabotageType.FakeIngredients:
-                // 送過期食材
-                break;
-            case SabotageType.TrafficJam:
-                // 堵住對手門口
-                break;
-        }
-    }
-}
-```
+這個系統將為遊戲增添不可預測性與挑戰性。
 
----
+**Unity 實作說明**:
 
-## UI/UX系統
+  - 創建一個 `EventManager` 腳本，使用一個計時器或隨機觸發器來觸發事件。
+  - 每個事件可以是一個 ScriptableObject，其中包含事件名稱、效果描述，以及觸發後的邏輯腳本。
+  - `EventManager` 在觸發事件時，會呼叫相應的邏輯，例如「熱浪來襲」事件會暫時提高飲料的銷售率，並可能觸發 `InventoryManager` 的特定函數。
 
-### 📱 智慧手機介面
-```csharp
-public class SmartphoneUI : MonoBehaviour 
-{
-    public GameObject reviewsPanel;
-    public GameObject newsPanel;
-    public GameObject marketPanel;
-    
-    public void ShowReviews()
-    {
-        // 顯示顧客評論與評分
-        UpdateReviewsList();
-    }
-    
-    public void ShowMarketPrices()
-    {
-        // 顯示食材市價波動圖表
-        UpdatePriceChart();
-    }
-}
-```
+-----
 
-### 🎮 第一人稱控制
-```csharp
-public class FirstPersonController : MonoBehaviour 
-{
-    public float mouseSensitivity = 2f;
-    public float moveSpeed = 5f;
-    public LayerMask interactableLayer;
-    
-    void Update()
-    {
-        HandleMouseLook();
-        HandleMovement();
-        HandleInteraction();
-    }
-    
-    void HandleInteraction()
-    {
-        if(Input.GetKeyDown(KeyCode.E))
-        {
-            RaycastHit hit;
-            if(Physics.Raycast(Camera.main.ScreenPointToRay(Input.mousePosition), out hit, 3f, interactableLayer))
-            {
-                IInteractable interactable = hit.collider.GetComponent<IInteractable>();
-                interactable?.Interact();
-            }
-        }
-    }
-}
-```
+## 7\. 多人網路系統
 
----
+網路同步是實現多人合作與競爭模式的關鍵。
 
-## 進度與存檔系統
+**Unity 實作說明**:
 
-### 💾 存檔資料結構
-```csharp
-[System.Serializable]
-public class SaveData 
-{
-    public float currentMoney;
-    public List<string> unlockedIngredients;
-    public List<string> completedMissions;
-    public Dictionary<string, int> employeeStats;
-    public List<string> unlockedTitles;
-    public RestaurantUpgrades upgrades;
-    
-    // 序列化為 JSON
-    public string ToJson()
-    {
-        return JsonUtility.ToJson(this);
-    }
-}
-```
+  - 選擇一個網路解決方案（如 Photon PUN 2 或 Mirror）。
+  - 使用\*\*網路變數（Networked Variables）\*\*來同步簡單的數據，如玩家位置和旋轉。
+  - 對於更複雜的數據（如披薩的配料清單），使用\*\*遠程程序呼叫（RPC）\*\*來確保所有客戶端同步。例如，當一個玩家在披薩上添加一個配料時，會發送一個 RPC 給所有玩家，以同步這個動作。
+  - 在 `NetworkManager` 腳本中，管理房間的創建、加入與退出，並處理玩家斷線重連的邏輯。
 
-### 🏆 成就系統
-```csharp
-public class AchievementSystem 
-{
-    public List<Achievement> achievements;
-    
-    public void CheckAchievements(GameAction action)
-    {
-        foreach(var achievement in achievements)
-        {
-            if(achievement.CheckCondition(action))
-            {
-                UnlockAchievement(achievement);
-            }
-        }
-    }
-}
-```
+-----
 
----
+## 8\. UI/UX 系統
 
-## 性能優化建議
+好的 UI/UX 設計可以讓玩家更輕鬆地管理混亂的店鋪。
 
-### 🚀 物理優化
-- 使用 **物理群組** 減少不必要的碰撞檢測
-- **LOD系統** 根據距離調整物理精度
-- **對象池** 管理經常生成/銷毀的披薩和配料
+**Unity 實作說明**:
 
-### 🎨 渲染優化
-- **批次渲染** 相同材質的配料
-- **遮擋剔除** 隱藏不可見的廚房設備
-- **動態載入** 根據需求載入資源
+  - 使用 Unity UI 系統（Canvas, Rect Transform）來建立所有介面。
+  - **手機介面**：使用一個 3D 模型作為手機，並在其螢幕上顯示 UI Canvas。這樣可以讓玩家在遊戲世界中直接操作手機。
+  - **訂單顯示**：使用一個動態列表來顯示所有待處理的訂單，並用顏色或圖標標示緊急程度。
+  - **日結算報表**：使用 UI 腳本動態生成圖表，顯示每日的營收、成本與利潤，並根據數據顯示有趣的文字註解。
 
-### 📡 網路優化
-- **狀態壓縮** 只同步關鍵變化
-- **預測演算法** 減少網路延遲影響
-- **頻率控制** 根據重要性調整同步頻率
+-----
 
-### 💾 記憶體優化
-```csharp
-public class MemoryManager 
-{
-    public void OptimizeMemory()
-    {
-        // 清理未使用的配料
-        Resources.UnloadUnusedAssets();
-        
-        // 垃圾回收
-        System.GC.Collect();
-        
-        // 壓縮材質
-        CompressTextures();
-    }
-}
-```
+## 9\. 進度與存檔系統
 
----
+存檔系統必須能夠保存玩家的進度，讓他們可以隨時繼續遊戲。
 
-## 開發階段建議
+**Unity 實作說明**:
 
-### Phase 1: 核心系統
-1. 基礎經營系統
-2. 簡單物理互動
-3. 基本UI框架
+  - 使用 **JSON 或二進位格式**來儲存遊戲資料。
+  - 存檔資料應包含：
+      - 玩家的當前金錢、等級與技能點。
+      - 餐廳的當前狀態（設備、裝潢）。
+      - 倉庫庫存與過期時間。
+      - 雇用的員工列表。
+      - 已解鎖的成就。
+  - 遊戲應在每個營業日結束時自動存檔，同時也提供手動存檔功能。
 
-### Phase 2: 內容擴充
-1. 配料系統完善
-2. 特殊顧客AI
-3. 事件系統
+-----
 
-### Phase 3: 多人與優化
-1. 網路同步
-2. 競爭模式
-3. 性能優化
+## 10\. 性能優化建議
 
-### Phase 4: 打磨與發布
-1. 平衡調整
-2. Bug修復
-3. 最終優化
+由於遊戲包含大量的物理互動，性能優化是開發的重點。
 
+**Unity 實作說明**:
+
+  - **物件池（Object Pooling）**：對於頻繁生成的物件（如食材、披薩），使用物件池技術來減少 `Instantiate` 和 `Destroy` 的開銷。
+  - **物理效能管理**：
+      - 調整物理更新頻率（`Time.fixedDeltaTime`），以平衡物理精確度與性能。
+      - 適當使用 `Rigidbody.IsKinematic` 來凍結不需要物理模擬的物件。
+  - **渲染優化**：
+      - 使用 **GPU Instancing** 來批量渲染相同的配料模型。
+      - 啟用**遮擋剔除（Occlusion Culling）**，以避免渲染被其他物件擋住的部分。
+
+-----
+
+## 11\. 成就系統
+
+成就系統將激勵玩家探索遊戲的深度與隱藏樂趣。
+
+**Unity 實作說明**:
+
+  - 創建一個 `AchievementManager` 腳本，負責追蹤玩家的遊戲進度。
+  - 使用一個 ScriptableObject 或 JSON 文件來定義所有成就，包括普通成就與隱藏成就，以及它們的解鎖條件。
+  - **事件監聽**：`AchievementManager` 將訂閱遊戲中的各類事件，例如：
+      - `OnPizzaMade(pizza)`: 檢查是否滿足「製作第一個披薩」或「黑暗料理」的條件。
+      - `OnReviewReceived(review)`: 檢查是否獲得五星或一星評價。
+      - `OnItemThrown(item)`: 檢查是否滿足「飛吧！披薩」的條件。
+  - 當滿足解鎖條件時，將成就狀態標記為「已解鎖」，並在 UI 上顯示通知。
 ---
 
 **這份文檔將隨開發進度持續更新，請定期檢查最新版本！** 🛠️✨
