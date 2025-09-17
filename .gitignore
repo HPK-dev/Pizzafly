@@ -1,0 +1,81 @@
+﻿# =============== #
+# Unity Core Files #
+# =============== #
+
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Prevent missing scenes or assets when meta files are removed accidentally
+# Note: keep *.meta for assets you want Unity to track
+!/[Aa]ssets/**/*.meta
+
+# =============== #
+# Version Control for Visual Scripting #
+# =============== #
+Assets/Unity.VisualScripting.Generated/**
+
+# =============== #
+# IDE / Editor / Tools #
+# =============== #
+
+# Visual Studio / VSCode / Rider / JetBrains
+.vs/
+/.idea/
+/*.sln
+*.csproj
+*.unityproj
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Rider plugin auto-generated stuff
+/[Aa]ssets/Plugins/Editor/JetBrains*
+
+# Gradle / build tools
+.gradle/
+
+# =============== #
+# Build Artifacts & Packages #
+# =============== #
+
+*.apk
+*.aab
+*.app
+*.exe
+*.xcodeproj
+*.xcworkspace
+*.ipa
+*.unitypackage
+
+# Packed Addressables data
+/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin
+
+# Temporary auto-generated Android Assets
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# =============== #
+# OS / Miscellaneous #
+# =============== #
+
+.DS_Store
+Thumbs.db
+sysinfo.txt
+
+# Crashlytics generated file (if using Crashlytics)
+crashlytics-build.properties
