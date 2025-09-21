@@ -1,5 +1,12 @@
 {
   "dependencies": {
+    "com.kandreyc.unity-csharp-patch": {
+      "version": "https://github.com/kandreyc/unity-csharp-patch.git#v1.4.0",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "32824dd3689e72817b3bd1e4b5b0d96637c44c56"
+    },
     "com.unity.ai.navigation": {
       "version": "2.0.8",
       "depth": 0,
