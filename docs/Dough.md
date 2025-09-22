@@ -24,8 +24,8 @@ DoughVertex {
     position: Vector3          // 當前世界座標
     restPosition: Vector3      // 初始位置（計算變形量）
     velocity: Vector3          // 速度（用於動態響應）
-    stretchProgress: float     // 延展進度 [0,1]
-    thickness: float          // 局部厚度
+    stretchProgress: float     // 延展進度 [0,100]
+    thickness: float          // 局部厚度 
     temperature: float        // 預留：溫度值
     isLocked: bool           // 延展完成後的鎖定標記
     gridIndex: int2          // 在網格中的索引位置
